@@ -6,14 +6,14 @@ import {
   Dialog, DialogTitle, DialogContent, DialogActions,
   TextField, CircularProgress, IconButton, Tooltip,
 } from '@mui/material';
-import { Payment, CheckCircle, History } from '@mui/icons-material';
+import { Payment, CheckCircle, History, Print, AttachFile } from '@mui/icons-material';
 import StatusChip from '../components/StatusChip';
 import {
   getAccounts, getAccountInvoices, payInvoice, getInvoicePayments, getPayment, getInvoice,
 } from '../services/killbill';
 import { getPlanFeatures } from '../services/planFeatures';
+import { saveAttachment } from '../services/attachments';
 import PaymentReceipt from '../components/PaymentReceipt';
-import { Print } from '@mui/icons-material';
 import dayjs from 'dayjs';
 import toast from 'react-hot-toast';
 
@@ -42,6 +42,7 @@ export default function Invoices() {
   const [payNote, setPayNote] = useState('');
   const [paying, setPaying] = useState(false);
   const [invPayments, setInvPayments] = useState([]);
+  const [pendingFiles, setPendingFiles] = useState([]);
 
   // Receipt
   const [receiptOpen, setReceiptOpen] = useState(false);
@@ -79,12 +80,25 @@ export default function Invoices() {
     setPayMethod('CASH');
     setPayReference('');
     setPayNote('');
+    setPendingFiles([]);
     setPayDialogOpen(true);
     try {
       const res = await getInvoicePayments(inv.invoiceId);
       setInvPayments(res.data || []);
     } catch { setInvPayments([]); }
   };
+
+  const handleFileSelect = (e) => {
+    const files = Array.from(e.target.files || []);
+    const valid = files.filter(f => {
+      if (f.size > 5 * 1024 * 1024) { toast.error(`${f.name} exceeds 5MB limit`); return false; }
+      return true;
+    });
+    setPendingFiles(prev => [...prev, ...valid]);
+    e.target.value = '';
+  };
+
+  const removePendingFile = (idx) => setPendingFiles(prev => prev.filter((_, i) => i !== idx));
 
   const handlePay = async () => {
     const amount = parseFloat(payAmount);
@@ -102,8 +116,15 @@ export default function Invoices() {
       });
       toast.success(`Payment of ৳${amount.toLocaleString()} recorded`);
       setPayDialogOpen(false);
-      // Show receipt
+
+      // Save attachments + show receipt
       const paymentId = res.headers?.location?.split('/').pop();
+      if (paymentId && pendingFiles.length > 0) {
+        for (const file of pendingFiles) {
+          await saveAttachment(paymentId, file);
+        }
+        toast.success(`${pendingFiles.length} attachment(s) saved`);
+      }
       if (paymentId) {
         try {
           const [payRes, invRes] = await Promise.all([
@@ -241,6 +262,19 @@ export default function Invoices() {
                     </Typography>
                   </Grid>
                 </Grid>
+                {(payTarget.items || []).length > 0 && (
+                  <Box sx={{ mt: 1.5, pt: 1.5, borderTop: '1px solid #e5e7eb' }}>
+                    {payTarget.items.map((item, i) => {
+                      const pf = getPlanFeatures(item.planName);
+                      return (
+                        <Box key={i} sx={{ display: 'flex', justifyContent: 'space-between', py: 0.2 }}>
+                          <Typography variant="caption">{pf?.displayName || item.planName}</Typography>
+                          <Typography variant="caption" sx={{ fontWeight: 500 }}>৳{parseFloat(item.amount).toLocaleString()}</Typography>
+                        </Box>
+                      );
+                    })}
+                  </Box>
+                )}
               </Box>
 
               {invPayments.length > 0 && (
@@ -290,13 +324,37 @@ export default function Invoices() {
                     value={payNote} onChange={(e) => setPayNote(e.target.value)} />
                 </Grid>
               </Grid>
-              <Box sx={{ display: 'flex', gap: 1 }}>
+              <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
                 <Button size="small" variant="outlined" onClick={() => setPayAmount(payTarget.balance.toString())}>
                   Full (৳{parseFloat(payTarget.balance).toLocaleString()})
                 </Button>
                 <Button size="small" variant="outlined" onClick={() => setPayAmount((parseFloat(payTarget.balance) / 2).toFixed(2))}>
                   Half
                 </Button>
+              </Box>
+
+              {/* File Attachments */}
+              <Box sx={{ border: '1px dashed #ccc', borderRadius: 1, p: 1.5 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: pendingFiles.length > 0 ? 1 : 0 }}>
+                  <Typography variant="caption" color="text.secondary">
+                    <AttachFile sx={{ fontSize: 14, mr: 0.5, verticalAlign: 'middle' }} />
+                    Attach receipt, cheque, bank slip (PDF, JPG, PNG — max 5MB)
+                  </Typography>
+                  <Button size="small" component="label" variant="outlined" sx={{ fontSize: 11 }}>
+                    Browse
+                    <input type="file" hidden multiple accept=".pdf,.jpg,.jpeg,.png,.gif,.webp"
+                      onChange={handleFileSelect} />
+                  </Button>
+                </Box>
+                {pendingFiles.length > 0 && (
+                  <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+                    {pendingFiles.map((f, i) => (
+                      <Chip key={i} label={`${f.name} (${(f.size / 1024).toFixed(0)}KB)`}
+                        size="small" sx={{ fontSize: 11 }}
+                        onDelete={() => removePendingFile(i)} />
+                    ))}
+                  </Box>
+                )}
               </Box>
             </Box>
           )}
