@@ -10,6 +10,7 @@ import {
 import {
   ArrowBack, Add as AddIcon, Pause, PlayArrow, Cancel, Payment,
   CheckCircle, ShoppingCart, History, Receipt as ReceiptIcon, Print,
+  AttachFile, Delete as DeleteIcon, Visibility,
 } from '@mui/icons-material';
 import StatusChip from '../components/StatusChip';
 import {
@@ -20,6 +21,7 @@ import {
 } from '../services/killbill';
 import PaymentReceipt from '../components/PaymentReceipt';
 import { getAllPlans, getPlanFeatures, getFeatureLabel, getProductName } from '../services/planFeatures';
+import { saveAttachment, getAttachments, deleteAttachment } from '../services/attachments';
 import toast from 'react-hot-toast';
 import dayjs from 'dayjs';
 
@@ -54,6 +56,13 @@ export default function CustomerDetail() {
   const [receiptOpen, setReceiptOpen] = useState(false);
   const [receiptPayment, setReceiptPayment] = useState(null);
   const [receiptInvoice, setReceiptInvoice] = useState(null);
+
+  // Attachments
+  const [pendingFiles, setPendingFiles] = useState([]);
+  const [attachOpen, setAttachOpen] = useState(false);
+  const [attachKey, setAttachKey] = useState('');
+  const [attachFiles, setAttachFiles] = useState([]);
+  const [previewFile, setPreviewFile] = useState(null);
 
   const loadData = useCallback(async () => {
     try {
@@ -97,6 +106,24 @@ export default function CustomerDetail() {
     { value: 'OTHER', label: 'Other' },
   ];
 
+  const handleFileSelect = (e) => {
+    const files = Array.from(e.target.files || []);
+    const valid = files.filter(f => {
+      if (f.size > 5 * 1024 * 1024) { toast.error(`${f.name} exceeds 5MB limit`); return false; }
+      return true;
+    });
+    setPendingFiles(prev => [...prev, ...valid]);
+    e.target.value = '';
+  };
+  const removePendingFile = (idx) => setPendingFiles(prev => prev.filter((_, i) => i !== idx));
+
+  const viewAttachments = (paymentId) => {
+    setAttachKey(paymentId);
+    setAttachFiles(getAttachments(paymentId));
+    setPreviewFile(null);
+    setAttachOpen(true);
+  };
+
   // Open payment dialog
   const openPayDialog = async (inv) => {
     const balance = parseFloat(inv.balance || 0);
@@ -106,6 +133,7 @@ export default function CustomerDetail() {
     setPayMethod('CASH');
     setPayReference('');
     setPayNote('');
+    setPendingFiles([]);
     setPayDialogOpen(true);
     try {
       const res = await getInvoicePayments(inv.invoiceId);
@@ -132,8 +160,13 @@ export default function CustomerDetail() {
       });
       toast.success(`Payment of ৳${amount.toLocaleString()} recorded${amount < balance ? ' (partial)' : ''}`);
       setPayDialogOpen(false);
-      // Show receipt for the payment just made
+      // Save attachments
       const paymentId = res.headers?.location?.split('/').pop();
+      if (paymentId && pendingFiles.length > 0) {
+        for (const file of pendingFiles) {
+          await saveAttachment(paymentId, file);
+        }
+      }
       if (paymentId) {
         try {
           const [payRes, invRes] = await Promise.all([
@@ -457,6 +490,13 @@ export default function CustomerDetail() {
                         ))}
                       </TableCell>
                       <TableCell align="right">
+                        {getAttachments(p.paymentId).length > 0 && (
+                          <Tooltip title={`${getAttachments(p.paymentId).length} attachment(s)`}>
+                            <IconButton size="small" onClick={() => viewAttachments(p.paymentId)}>
+                              <AttachFile fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        )}
                         <Tooltip title="View Receipt">
                           <IconButton size="small" onClick={() => viewReceipt(p)}>
                             <ReceiptIcon fontSize="small" />
@@ -565,13 +605,37 @@ export default function CustomerDetail() {
                   />
                 </Grid>
               </Grid>
-              <Box sx={{ display: 'flex', gap: 1 }}>
+              <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
                 <Button size="small" variant="outlined" onClick={() => setPayAmount(payTarget.balance.toString())}>
                   Full (৳{parseFloat(payTarget.balance).toLocaleString()})
                 </Button>
                 <Button size="small" variant="outlined" onClick={() => setPayAmount((parseFloat(payTarget.balance) / 2).toFixed(2))}>
                   Half (৳{(parseFloat(payTarget.balance) / 2).toLocaleString()})
                 </Button>
+              </Box>
+
+              {/* File Attachments */}
+              <Box sx={{ border: '1px dashed #ccc', borderRadius: 1, p: 1.5 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: pendingFiles.length > 0 ? 1 : 0 }}>
+                  <Typography variant="caption" color="text.secondary">
+                    <AttachFile sx={{ fontSize: 14, mr: 0.5, verticalAlign: 'middle' }} />
+                    Attach receipt, cheque, bank slip (PDF, JPG, PNG — max 5MB)
+                  </Typography>
+                  <Button size="small" component="label" variant="outlined" sx={{ fontSize: 11 }}>
+                    Browse
+                    <input type="file" hidden multiple accept=".pdf,.jpg,.jpeg,.png,.gif,.webp"
+                      onChange={handleFileSelect} />
+                  </Button>
+                </Box>
+                {pendingFiles.length > 0 && (
+                  <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+                    {pendingFiles.map((f, i) => (
+                      <Chip key={i} label={`${f.name} (${(f.size / 1024).toFixed(0)}KB)`}
+                        size="small" sx={{ fontSize: 11 }}
+                        onDelete={() => removePendingFile(i)} />
+                    ))}
+                  </Box>
+                )}
               </Box>
             </Box>
           )}
@@ -581,6 +645,87 @@ export default function CustomerDetail() {
           <Button variant="contained" onClick={handlePay} disabled={paying} startIcon={<Payment />}>
             {paying ? 'Processing...' : `Record ৳${parseFloat(payAmount || 0).toLocaleString()} Payment`}
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Attachment Viewer Dialog */}
+      <Dialog open={attachOpen} onClose={() => { setAttachOpen(false); setPreviewFile(null); }} maxWidth="md" fullWidth>
+        <DialogTitle>Payment Attachments</DialogTitle>
+        <DialogContent>
+          {previewFile ? (
+            <Box>
+              <Button size="small" onClick={() => setPreviewFile(null)} sx={{ mb: 1 }}>Back to list</Button>
+              <Typography variant="subtitle2" sx={{ mb: 1 }}>{previewFile.name}</Typography>
+              {previewFile.type?.startsWith('image/') ? (
+                <Box component="img" src={previewFile.data} alt={previewFile.name}
+                  sx={{ maxWidth: '100%', maxHeight: 500, borderRadius: 1, border: '1px solid #e5e7eb' }} />
+              ) : previewFile.type === 'application/pdf' ? (
+                <Box component="iframe" src={previewFile.data} title={previewFile.name}
+                  sx={{ width: '100%', height: 500, border: '1px solid #e5e7eb', borderRadius: 1 }} />
+              ) : (
+                <Alert severity="info">Preview not available. <a href={previewFile.data} download={previewFile.name}>Download</a></Alert>
+              )}
+            </Box>
+          ) : (
+            attachFiles.length === 0 ? (
+              <Typography color="text.secondary" sx={{ py: 2 }}>No attachments.</Typography>
+            ) : (
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>File</TableCell>
+                    <TableCell>Size</TableCell>
+                    <TableCell>Uploaded</TableCell>
+                    <TableCell align="right">Actions</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {attachFiles.map(att => (
+                    <TableRow key={att.id}>
+                      <TableCell>{att.name}</TableCell>
+                      <TableCell>{(att.size / 1024).toFixed(0)} KB</TableCell>
+                      <TableCell>{dayjs(att.uploadedAt).format('YYYY-MM-DD HH:mm')}</TableCell>
+                      <TableCell align="right">
+                        <Tooltip title="View">
+                          <IconButton size="small" onClick={() => setPreviewFile(att)}>
+                            <Visibility fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Delete">
+                          <IconButton size="small" color="error" onClick={() => {
+                            deleteAttachment(attachKey, att.id);
+                            setAttachFiles(getAttachments(attachKey));
+                          }}>
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )
+          )}
+          {!previewFile && (
+            <Box sx={{ mt: 2 }}>
+              <Button size="small" component="label" variant="outlined" startIcon={<AttachFile />}>
+                Add Attachment
+                <input type="file" hidden multiple accept=".pdf,.jpg,.jpeg,.png,.gif,.webp"
+                  onChange={async (e) => {
+                    const files = Array.from(e.target.files || []);
+                    for (const f of files) {
+                      if (f.size > 5 * 1024 * 1024) { toast.error(`${f.name} exceeds 5MB`); continue; }
+                      await saveAttachment(attachKey, f);
+                    }
+                    setAttachFiles(getAttachments(attachKey));
+                    e.target.value = '';
+                  }} />
+              </Button>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => { setAttachOpen(false); setPreviewFile(null); }}>Close</Button>
         </DialogActions>
       </Dialog>
 
