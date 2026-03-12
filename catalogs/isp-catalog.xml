@@ -2,7 +2,7 @@
 <catalog xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:noNamespaceSchemaLocation="CatalogSchema.xsd ">
 
-    <effectiveDate>2026-03-12T00:00:00+06:00</effectiveDate>
+    <effectiveDate>2026-03-12T00:00:00+00:00</effectiveDate>
     <catalogName>TelcobrightISP</catalogName>
 
     <recurringBillingMode>IN_ADVANCE</recurringBillingMode>
@@ -11,56 +11,33 @@
         <currency>BDT</currency>
     </currencies>
 
-    <!-- ==================== PRODUCTS ==================== -->
     <products>
-        <!-- Internet Services -->
         <product name="Internet-100Mbps">
             <category>BASE</category>
-            <included/>
-            <available/>
         </product>
         <product name="Internet-50Mbps">
             <category>BASE</category>
-            <included/>
-            <available/>
         </product>
         <product name="Internet-200Mbps">
             <category>BASE</category>
-            <included/>
-            <available/>
         </product>
-
-        <!-- Telecom Services (from BTCL portal) -->
         <product name="HostedPBX">
             <category>BASE</category>
-            <included/>
-            <available/>
         </product>
         <product name="VoiceBroadcast">
             <category>BASE</category>
-            <included/>
-            <available/>
         </product>
         <product name="ContactCenter">
             <category>BASE</category>
-            <included/>
-            <available/>
         </product>
         <product name="BulkSMS">
             <category>BASE</category>
-            <included/>
-            <available/>
         </product>
-
-        <!-- Add-ons -->
         <product name="StaticIP">
             <category>ADD_ON</category>
-            <included/>
-            <available/>
         </product>
     </products>
 
-    <!-- ==================== RULES ==================== -->
     <rules>
         <changePolicy>
             <changePolicyCase>
@@ -82,24 +59,11 @@
                 <alignment>START_OF_BUNDLE</alignment>
             </createAlignmentCase>
         </createAlignment>
-        <billingAlignment>
-            <billingAlignmentCase>
-                <alignment>ACCOUNT</alignment>
-            </billingAlignmentCase>
-        </billingAlignment>
-        <priceList>
-            <priceListCase>
-                <toPriceList>DEFAULT</toPriceList>
-            </priceListCase>
-        </priceList>
     </rules>
 
-    <!-- ==================== PLANS ==================== -->
     <plans>
-        <!-- Internet 100 Mbps Prepaid Monthly -->
-        <plan name="internet-100mbps-prepaid-monthly">
+        <plan name="internet-100mbps-monthly">
             <product>Internet-100Mbps</product>
-            <initialPhases/>
             <finalPhase type="EVERGREEN">
                 <duration>
                     <unit>UNLIMITED</unit>
@@ -116,10 +80,8 @@
             </finalPhase>
         </plan>
 
-        <!-- Internet 50 Mbps Prepaid Monthly -->
-        <plan name="internet-50mbps-prepaid-monthly">
+        <plan name="internet-50mbps-monthly">
             <product>Internet-50Mbps</product>
-            <initialPhases/>
             <finalPhase type="EVERGREEN">
                 <duration>
                     <unit>UNLIMITED</unit>
@@ -136,10 +98,8 @@
             </finalPhase>
         </plan>
 
-        <!-- Internet 200 Mbps Prepaid Monthly -->
-        <plan name="internet-200mbps-prepaid-monthly">
+        <plan name="internet-200mbps-monthly">
             <product>Internet-200Mbps</product>
-            <initialPhases/>
             <finalPhase type="EVERGREEN">
                 <duration>
                     <unit>UNLIMITED</unit>
@@ -156,10 +116,8 @@
             </finalPhase>
         </plan>
 
-        <!-- Hosted PBX Monthly -->
         <plan name="hosted-pbx-monthly">
             <product>HostedPBX</product>
-            <initialPhases/>
             <finalPhase type="EVERGREEN">
                 <duration>
                     <unit>UNLIMITED</unit>
@@ -176,10 +134,8 @@
             </finalPhase>
         </plan>
 
-        <!-- Voice Broadcast Monthly -->
         <plan name="voice-broadcast-monthly">
             <product>VoiceBroadcast</product>
-            <initialPhases/>
             <finalPhase type="EVERGREEN">
                 <duration>
                     <unit>UNLIMITED</unit>
@@ -196,10 +152,8 @@
             </finalPhase>
         </plan>
 
-        <!-- Contact Center Monthly -->
         <plan name="contact-center-monthly">
             <product>ContactCenter</product>
-            <initialPhases/>
             <finalPhase type="EVERGREEN">
                 <duration>
                     <unit>UNLIMITED</unit>
@@ -216,10 +170,8 @@
             </finalPhase>
         </plan>
 
-        <!-- Bulk SMS Monthly -->
         <plan name="bulk-sms-monthly">
             <product>BulkSMS</product>
-            <initialPhases/>
             <finalPhase type="EVERGREEN">
                 <duration>
                     <unit>UNLIMITED</unit>
@@ -236,10 +188,8 @@
             </finalPhase>
         </plan>
 
-        <!-- Static IP Add-on -->
         <plan name="static-ip-monthly">
             <product>StaticIP</product>
-            <initialPhases/>
             <finalPhase type="EVERGREEN">
                 <duration>
                     <unit>UNLIMITED</unit>
@@ -257,13 +207,12 @@
         </plan>
     </plans>
 
-    <!-- ==================== PRICE LISTS ==================== -->
     <priceLists>
         <defaultPriceList name="DEFAULT">
             <plans>
-                <plan>internet-100mbps-prepaid-monthly</plan>
-                <plan>internet-50mbps-prepaid-monthly</plan>
-                <plan>internet-200mbps-prepaid-monthly</plan>
+                <plan>internet-100mbps-monthly</plan>
+                <plan>internet-50mbps-monthly</plan>
+                <plan>internet-200mbps-monthly</plan>
                 <plan>hosted-pbx-monthly</plan>
                 <plan>voice-broadcast-monthly</plan>
                 <plan>contact-center-monthly</plan>

@@ -1,13 +1,7 @@
-<?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<overdueConfig>
+<?xml version="1.0" encoding="UTF-8"?>
+<overdueConfig xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+               xsi:noNamespaceSchemaLocation="https://docs.killbill.io/latest/overdue.xsd">
     <accountOverdueStates>
-        <!--
-            State flow for unpaid invoices:
-            GOOD -> WARNING (7 days) -> SUSPENDED (14 days) -> DISCONNECTED (30 days)
-
-            When paid at any stage -> auto-clears back to GOOD
-        -->
-
         <!-- After 30 days unpaid: disconnect service -->
         <state name="DISCONNECTED">
             <condition>
@@ -16,17 +10,15 @@
                     <number>30</number>
                 </timeSinceEarliestUnpaidInvoiceEqualsOrExceeds>
             </condition>
-            <externalMessage>Account disconnected due to non-payment. Please contact support.</externalMessage>
+            <externalMessage>Account disconnected due to non-payment.</externalMessage>
             <blockChanges>true</blockChanges>
-            <disableEntitlement>true</disableEntitlement>
-            <isClearState>false</isClearState>
+            <disableEntitlementAndChangesBlocked>true</disableEntitlementAndChangesBlocked>
             <autoReevaluationInterval>
-                <unit>DAYS</unit>
-                <number>7</number>
+                <unit>DAYS</unit><number>7</number>
             </autoReevaluationInterval>
         </state>
 
-        <!-- After 14 days unpaid: suspend service (block line) -->
+        <!-- After 14 days unpaid: suspend service -->
         <state name="SUSPENDED">
             <condition>
                 <timeSinceEarliestUnpaidInvoiceEqualsOrExceeds>
@@ -34,13 +26,11 @@
                     <number>14</number>
                 </timeSinceEarliestUnpaidInvoiceEqualsOrExceeds>
             </condition>
-            <externalMessage>Service suspended due to overdue payment. Pay now to restore.</externalMessage>
+            <externalMessage>Service suspended due to overdue payment.</externalMessage>
             <blockChanges>true</blockChanges>
-            <disableEntitlement>true</disableEntitlement>
-            <isClearState>false</isClearState>
+            <disableEntitlementAndChangesBlocked>true</disableEntitlementAndChangesBlocked>
             <autoReevaluationInterval>
-                <unit>DAYS</unit>
-                <number>5</number>
+                <unit>DAYS</unit><number>5</number>
             </autoReevaluationInterval>
         </state>
 
@@ -52,13 +42,11 @@
                     <number>7</number>
                 </timeSinceEarliestUnpaidInvoiceEqualsOrExceeds>
             </condition>
-            <externalMessage>Payment overdue. Please pay within 7 days to avoid service suspension.</externalMessage>
+            <externalMessage>Payment overdue. Pay within 7 days to avoid suspension.</externalMessage>
             <blockChanges>false</blockChanges>
-            <disableEntitlement>false</disableEntitlement>
-            <isClearState>false</isClearState>
+            <disableEntitlementAndChangesBlocked>false</disableEntitlementAndChangesBlocked>
             <autoReevaluationInterval>
-                <unit>DAYS</unit>
-                <number>3</number>
+                <unit>DAYS</unit><number>3</number>
             </autoReevaluationInterval>
         </state>
     </accountOverdueStates>

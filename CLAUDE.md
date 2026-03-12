@@ -158,7 +158,12 @@ All requests need these headers:
 | Resume subscription | PUT | `/1.0/kb/subscriptions/{id}/resume` |
 | Cancel subscription | DELETE | `/1.0/kb/subscriptions/{id}` |
 | List invoices | GET | `/1.0/kb/accounts/{id}/invoices` |
-| Pay invoice | POST | `/1.0/kb/accounts/{id}/payments` |
+| Get invoice details | GET | `/1.0/kb/invoices/{id}?withItems=true` |
+| Pay invoice | POST | `/1.0/kb/invoices/{invoiceId}/payments` |
+| Get invoice payments | GET | `/1.0/kb/invoices/{invoiceId}/payments` |
+| Get account payments | GET | `/1.0/kb/accounts/{id}/payments` |
+| Get payment detail | GET | `/1.0/kb/payments/{paymentId}?withAttempts=true` |
+| Search payments | GET | `/1.0/kb/payments/search/{key}` |
 | Get overdue state | GET | `/1.0/kb/accounts/{id}/overdue` |
 | Upload catalog | POST | `/1.0/kb/catalog/xml` |
 | Get catalog | GET | `/1.0/kb/catalog/simpleCatalog` |
@@ -167,6 +172,67 @@ All requests need these headers:
 
 Full API docs: https://apidocs.killbill.io
 
+## Payment API Reference
+
+### Pay an Invoice (Manual / External)
+```bash
+# Full or partial payment — same API for manual admin and gateway callback
+curl -X POST "http://localhost:18080/1.0/kb/invoices/{invoiceId}/payments" \
+  -u admin:password \
+  -H 'X-Killbill-ApiKey: telcobright-isp' \
+  -H 'X-Killbill-ApiSecret: telcobright-isp-secret' \
+  -H 'X-Killbill-CreatedBy: admin' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "accountId": "{accountId}",
+    "purchasedAmount": 500,
+    "currency": "BDT",
+    "isExternal": true,
+    "transactionExternalKey": "BKASH:TRX123456:Monthly payment"
+  }'
+# Returns: 201 Created, Location header contains payment ID
+```
+
+### Payment Fields
+| Field | Required | Description |
+|-------|----------|-------------|
+| `accountId` | Yes | Kill Bill account UUID |
+| `purchasedAmount` | Yes | Amount to pay (supports partial — pay less than invoice balance) |
+| `currency` | Yes | `BDT`, `USD`, etc. |
+| `isExternal` | For manual | Set `true` for manual/external payments (no gateway plugin) |
+| `paymentMethodId` | For gateway | Kill Bill payment method UUID (from gateway plugin registration) |
+| `transactionExternalKey` | No | External reference for tracking. Format: `METHOD:REFERENCE:NOTE` |
+
+### transactionExternalKey Convention
+We encode payment metadata in `transactionExternalKey` as colon-separated values:
+```
+{PAYMENT_METHOD}:{EXTERNAL_REFERENCE}:{NOTE}
+```
+Examples:
+- `CASH` — cash payment, no reference
+- `BANK_TRANSFER:REF20260313001:March payment` — bank transfer with reference
+- `BKASH:TRX9A8B7C:` — bKash mobile payment with transaction ID
+- `ONLINE:ORD-12345:SSLCommerz` — gateway payment with order ID
+
+Payment methods: `CASH`, `BANK_TRANSFER`, `BKASH`, `NAGAD`, `ROCKET`, `CHEQUE`, `ONLINE`, `OTHER`
+
+### Gateway Integration Pattern
+For online payment gateway (e.g., SSLCommerz):
+1. Frontend initiates payment → redirect to gateway
+2. Gateway processes → sends callback to your backend
+3. Backend callback handler calls `payInvoice()` with:
+   - `isExternal: true` (or use a Kill Bill payment plugin)
+   - `transactionExternalKey: "ONLINE:{gateway_order_id}:{gateway_name}"`
+4. Kill Bill records payment → clears overdue if fully paid
+5. UI shows receipt with gateway reference
+
+### Payment Receipt Tracking
+- Each payment gets a unique `paymentId` (UUID) from Kill Bill
+- Each transaction within a payment gets a `transactionId` (UUID)
+- `transactionExternalKey` stores the external reference (bank ref, gateway order ID, etc.)
+- Receipt is viewable and printable from UI (Payments tab or Invoices page)
+- `GET /payments/{paymentId}?withAttempts=true` returns full payment detail with all transaction attempts
+
 ## Integration with BTCL SMS Portal
 The BTCL SMS Portal at `/home/mustafa/telcobright-projects/btcl-sms-portal` will push purchases to this billing system via:
 1. REST API calls from portal backend to Kill Bill
@@ -174,11 +240,29 @@ The BTCL SMS Portal at `/home/mustafa/telcobright-projects/btcl-sms-portal` will
 
 Flow: Portal purchase → Kill Bill subscription → Invoice → Payment → Activation event → Portal callback
 
+## UI Pages
+| Page | Path | Description |
+|------|------|-------------|
+| Dashboard | `/` | Overview metrics |
+| Customers | `/customers` | List, create, click to detail |
+| Customer Detail | `/customers/:id` | Subscriptions, invoices, payments, AR summary, purchase, pay, receipt |
+| Subscriptions | `/subscriptions` | All subscriptions across customers |
+| Invoices | `/invoices` | All invoices with pay button, partial payment, receipt |
+| Payments | `/payments` | All payments with method/reference, receipt view/print |
+| Catalog | `/catalog` | Plans with features, category filter |
+| AR Report | `/reports/ar` | Cross-customer accounts receivable summary |
+| Tenants | `/tenants` | Super admin: create/manage tenants |
+
 ## Future Work
-- [ ] Custom React UI (reuse SOFTSWITCH_DASHBOARD styling from `/home/mustafa/telcobright-projects/SOFTSWITCH_DASHBOARD`)
-- [ ] SSLCommerz payment plugin for Kill Bill
+- [x] Custom React UI with MUI (port 5180)
+- [x] Multi-tenant management with login/tenant selector
+- [x] Subscription purchase from UI
+- [x] Full/partial payment with method tracking and receipt
+- [x] Accounts receivable report
+- [ ] SSLCommerz payment gateway integration
 - [ ] Kafka event bridge for external consumers
-- [ ] Email notification consumer
+- [ ] Email notification consumer (invoice, payment receipt, overdue)
 - [ ] Line activation/deactivation plugin
 - [ ] Per-tenant invoice templates
 - [ ] Usage-based billing for SMS/voice
+- [ ] ERPNext accounting integration (Phase 2)
