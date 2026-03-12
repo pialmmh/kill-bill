@@ -1,0 +1,29 @@
+# Kill Bill source (cloned separately, not committed)
+killbill-server/
+
+# Build artifacts
+target/
+*.class
+*.jar
+*.war
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.project
+.classpath
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Node (for future UI)
+node_modules/
+dist/
+.env
+.env.local
