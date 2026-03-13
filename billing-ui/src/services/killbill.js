@@ -100,16 +100,17 @@ export const payInvoice = (invoiceId, accountId, amount, {
     purchasedAmount: amount,
     currency,
   };
+  const params = {};
   // External payment (manual / no gateway plugin)
   if (!paymentMethodId) {
-    body.isExternal = true;
+    params.externalPayment = true;
   } else {
     body.paymentMethodId = paymentMethodId;
   }
   if (transactionExternalKey) {
-    body.transactionExternalKey = transactionExternalKey;
+    body.paymentExternalKey = transactionExternalKey;
   }
-  return api.post(`/invoices/${invoiceId}/payments`, body);
+  return api.post(`/invoices/${invoiceId}/payments`, body, { params });
 };
 
 // Get payments for a specific invoice
