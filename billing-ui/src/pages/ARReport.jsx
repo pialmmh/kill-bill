@@ -7,10 +7,11 @@ import {
 } from '@mui/material';
 import { Search as SearchIcon } from '@mui/icons-material';
 import { getAccounts, getAccountInvoicesList, getAccountPayments } from '../services/killbill';
-import toast from 'react-hot-toast';
+import { useNotification } from '../components/ErrorNotification';
 
 export default function ARReport() {
   const navigate = useNavigate();
+  const { error: notifyError } = useNotification();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -87,7 +88,7 @@ export default function ARReport() {
 
       setRows(enriched);
     } catch (e) {
-      toast.error('Failed to load AR report');
+      notifyError('Failed to load AR report');
     } finally {
       setLoading(false);
     }

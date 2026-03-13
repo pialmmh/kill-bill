@@ -22,7 +22,8 @@ import {
 import PaymentReceipt from '../components/PaymentReceipt';
 import { getAllPlans, getPlanFeatures, getFeatureLabel, getProductName } from '../services/planFeatures';
 import { saveAttachment, getAttachments, deleteAttachment } from '../services/attachments';
-import toast from 'react-hot-toast';
+import { useNotification } from '../components/ErrorNotification';
+import { extractError } from '../services/errorHelper';
 import dayjs from 'dayjs';
 
 export default function CustomerDetail() {
@@ -64,6 +65,8 @@ export default function CustomerDetail() {
   const [attachFiles, setAttachFiles] = useState([]);
   const [previewFile, setPreviewFile] = useState(null);
 
+  const { success, error: notifyError } = useNotification();
+
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
@@ -80,7 +83,8 @@ export default function CustomerDetail() {
       setPayments(paymentsRes.data || []);
       if (overdueRes) setOverdue(overdueRes.data);
     } catch (e) {
-      toast.error('Failed to load customer');
+      const { message, detail } = extractError(e, 'Failed to load customer');
+      notifyError(message, detail);
     } finally {
       setLoading(false);
     }
@@ -109,7 +113,7 @@ export default function CustomerDetail() {
   const handleFileSelect = (e) => {
     const files = Array.from(e.target.files || []);
     const valid = files.filter(f => {
-      if (f.size > 5 * 1024 * 1024) { toast.error(`${f.name} exceeds 5MB limit`); return false; }
+      if (f.size > 5 * 1024 * 1024) { notifyError(`${f.name} exceeds 5MB limit`); return false; }
       return true;
     });
     setPendingFiles(prev => [...prev, ...valid]);
@@ -127,7 +131,7 @@ export default function CustomerDetail() {
   // Open payment dialog
   const openPayDialog = async (inv) => {
     const balance = parseFloat(inv.balance || 0);
-    if (balance <= 0) { toast.error('Invoice already paid'); return; }
+    if (balance <= 0) { notifyError('Invoice already paid'); return; }
     setPayTarget(inv);
     setPayAmount(balance.toString());
     setPayMethod('CASH');
@@ -144,9 +148,9 @@ export default function CustomerDetail() {
   // Execute payment (full or partial)
   const handlePay = async () => {
     const amount = parseFloat(payAmount);
-    if (!amount || amount <= 0) { toast.error('Enter a valid amount'); return; }
+    if (!amount || amount <= 0) { notifyError('Enter a valid amount'); return; }
     const balance = parseFloat(payTarget.balance);
-    if (amount > balance) { toast.error(`Amount exceeds balance (৳${balance.toLocaleString()})`); return; }
+    if (amount > balance) { notifyError(`Amount exceeds balance (৳${balance.toLocaleString()})`); return; }
     // Build external reference key: METHOD:REFERENCE:NOTE
     const refParts = [payMethod];
     if (payReference) refParts.push(payReference);
@@ -158,7 +162,7 @@ export default function CustomerDetail() {
         currency: payTarget.currency || 'BDT',
         transactionExternalKey,
       });
-      toast.success(`Payment of ৳${amount.toLocaleString()} recorded${amount < balance ? ' (partial)' : ''}`);
+      success(`Payment of ৳${amount.toLocaleString()} recorded${amount < balance ? ' (partial)' : ''}`);
       setPayDialogOpen(false);
       // Save attachments
       const paymentId = res.headers?.location?.split('/').pop();
@@ -180,7 +184,8 @@ export default function CustomerDetail() {
       }
       loadData();
     } catch (e) {
-      toast.error(e.response?.data?.message || 'Payment failed');
+      const { message, detail } = extractError(e, 'Payment failed');
+      notifyError(message, detail);
     } finally {
       setPaying(false);
     }
@@ -198,7 +203,7 @@ export default function CustomerDetail() {
       setReceiptInvoice(targetInvoice || null);
       setReceiptOpen(true);
     } catch {
-      toast.error('Failed to load receipt');
+      notifyError('Failed to load receipt');
     }
   };
 
@@ -232,11 +237,12 @@ export default function CustomerDetail() {
         billingPeriod: 'MONTHLY',
         priceList: 'DEFAULT',
       });
-      toast.success(`Subscribed to ${plan.displayName}`);
+      success(`Subscribed to ${plan.displayName}`);
       setPurchaseStep(2);
       loadData();
     } catch (e) {
-      toast.error(e.response?.data?.message || 'Failed to create subscription');
+      const { message, detail } = extractError(e, 'Failed to create subscription');
+      notifyError(message, detail);
     } finally { setSaving(false); }
   };
   const closePurchase = () => { setPurchaseOpen(false); setPurchaseStep(0); setSelectedPlan(null); };
@@ -246,9 +252,9 @@ export default function CustomerDetail() {
       if (action === 'cancel') await cancelSubscription(subId);
       else if (action === 'pause') await pauseSubscription(subId);
       else if (action === 'resume') await resumeSubscription(subId);
-      toast.success(`Subscription ${action}ed`);
+      success(`Subscription ${action}ed`);
       loadData();
-    } catch (e) { toast.error(e.response?.data?.message || `Failed to ${action}`); }
+    } catch (e) { const { message, detail } = extractError(e, `Failed to ${action}`); notifyError(message, detail); }
   };
 
   if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}><CircularProgress /></Box>;
@@ -714,7 +720,7 @@ export default function CustomerDetail() {
                   onChange={async (e) => {
                     const files = Array.from(e.target.files || []);
                     for (const f of files) {
-                      if (f.size > 5 * 1024 * 1024) { toast.error(`${f.name} exceeds 5MB`); continue; }
+                      if (f.size > 5 * 1024 * 1024) { notifyError(`${f.name} exceeds 5MB`); continue; }
                       await saveAttachment(attachKey, f);
                     }
                     setAttachFiles(getAttachments(attachKey));

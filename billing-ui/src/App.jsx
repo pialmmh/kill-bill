@@ -1,8 +1,8 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider, CssBaseline } from '@mui/material';
-import { Toaster } from 'react-hot-toast';
 import theme from './theme/theme';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { NotificationProvider } from './components/ErrorNotification';
 import MainLayout from './layouts/MainLayout';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
@@ -53,12 +53,13 @@ export default function App() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <Toaster position="top-right" toastOptions={{ duration: 3000 }} />
-      <AuthProvider>
-        <BrowserRouter>
-          <AppRoutes />
-        </BrowserRouter>
-      </AuthProvider>
+      <NotificationProvider>
+        <AuthProvider>
+          <BrowserRouter>
+            <AppRoutes />
+          </BrowserRouter>
+        </AuthProvider>
+      </NotificationProvider>
     </ThemeProvider>
   );
 }

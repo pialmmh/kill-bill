@@ -19,7 +19,8 @@ import {
 } from '../services/killbill';
 import { getPlanFeatures } from '../services/planFeatures';
 import { saveAttachment, getAttachments, deleteAttachment } from '../services/attachments';
-import toast from 'react-hot-toast';
+import { useNotification } from '../components/ErrorNotification';
+import { extractError } from '../services/errorHelper';
 import dayjs from 'dayjs';
 
 const PAYMENT_METHODS_MAP = {
@@ -31,6 +32,7 @@ const PAYMENT_METHODS = Object.entries(PAYMENT_METHODS_MAP).map(([value, label])
 
 export default function Payments() {
   const navigate = useNavigate();
+  const { success, error: notifyError } = useNotification();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -88,7 +90,7 @@ export default function Payments() {
         return new Date(db) - new Date(da);
       });
       setRows(all);
-    } catch { toast.error('Failed to load payments'); }
+    } catch { notifyError('Failed to load payments'); }
     setLoading(false);
   }, []);
 
@@ -108,7 +110,7 @@ export default function Payments() {
       const allInv = res.data || [];
       const unpaid = allInv.filter(inv => parseFloat(inv.balance || 0) > 0 && parseFloat(inv.amount || 0) > 0);
       setUnpaidInvoices(unpaid);
-    } catch { toast.error('Failed to load invoices'); }
+    } catch { notifyError('Failed to load invoices'); }
     setLoadingInvoices(false);
   };
 
@@ -143,7 +145,7 @@ export default function Payments() {
   const handleFileSelect = (e) => {
     const files = Array.from(e.target.files || []);
     const valid = files.filter(f => {
-      if (f.size > 5 * 1024 * 1024) { toast.error(`${f.name} exceeds 5MB limit`); return false; }
+      if (f.size > 5 * 1024 * 1024) { notifyError(`${f.name} exceeds 5MB limit`); return false; }
       return true;
     });
     setPendingFiles(prev => [...prev, ...valid]);
@@ -169,13 +171,13 @@ export default function Payments() {
 
   const handlePay = async () => {
     if (!selectedAccountId || !selectedInvoiceId) {
-      toast.error('Select customer and invoice');
+      notifyError('Select customer and invoice');
       return;
     }
     const amount = parseFloat(payAmount);
-    if (!amount || amount <= 0) { toast.error('Enter a valid amount'); return; }
+    if (!amount || amount <= 0) { notifyError('Enter a valid amount'); return; }
     const balance = parseFloat(selectedInvoice?.balance || 0);
-    if (amount > balance) { toast.error(`Amount exceeds balance (৳${balance.toLocaleString()})`); return; }
+    if (amount > balance) { notifyError(`Amount exceeds balance (৳${balance.toLocaleString()})`); return; }
 
     const refParts = [payMethod];
     if (payReference) refParts.push(payReference);
@@ -187,7 +189,7 @@ export default function Payments() {
         currency: selectedInvoice?.currency || 'BDT',
         transactionExternalKey: refParts.join(':'),
       });
-      toast.success(`Payment of ৳${amount.toLocaleString()} recorded`);
+      success(`Payment of ৳${amount.toLocaleString()} recorded`);
       setPayOpen(false);
 
       // Save attachments
@@ -196,7 +198,7 @@ export default function Payments() {
         for (const file of pendingFiles) {
           await saveAttachment(paymentId, file);
         }
-        toast.success(`${pendingFiles.length} attachment(s) saved`);
+        success(`${pendingFiles.length} attachment(s) saved`);
       }
 
       // Show receipt
@@ -214,7 +216,8 @@ export default function Payments() {
       }
       loadPayments();
     } catch (e) {
-      toast.error(e.response?.data?.message || 'Payment failed');
+      const { message, detail } = extractError(e, 'Payment failed');
+      notifyError(message, detail);
     } finally { setPaying(false); }
   };
 
@@ -235,7 +238,7 @@ export default function Payments() {
       setReceiptAccount(p.accountData);
       setReceiptInvoice(null);
       setReceiptOpen(true);
-    } catch { toast.error('Failed to load receipt'); }
+    } catch { notifyError('Failed to load receipt'); }
   };
 
   const handlePrintReceipt = () => {
@@ -593,12 +596,12 @@ export default function Payments() {
                   onChange={async (e) => {
                     const files = Array.from(e.target.files || []);
                     for (const f of files) {
-                      if (f.size > 5 * 1024 * 1024) { toast.error(`${f.name} exceeds 5MB`); continue; }
+                      if (f.size > 5 * 1024 * 1024) { notifyError(`${f.name} exceeds 5MB`); continue; }
                       await saveAttachment(attachKey, f);
                     }
                     setAttachFiles(getAttachments(attachKey));
                     e.target.value = '';
-                    toast.success('Attachment(s) added');
+                    success('Attachment(s) added');
                   }} />
               </Button>
             </Box>

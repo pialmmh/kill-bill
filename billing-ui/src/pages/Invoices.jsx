@@ -14,8 +14,9 @@ import {
 import { getPlanFeatures } from '../services/planFeatures';
 import { saveAttachment } from '../services/attachments';
 import PaymentReceipt from '../components/PaymentReceipt';
+import { useNotification } from '../components/ErrorNotification';
+import { extractError } from '../services/errorHelper';
 import dayjs from 'dayjs';
-import toast from 'react-hot-toast';
 
 const PAYMENT_METHODS = [
   { value: 'CASH', label: 'Cash' },
@@ -30,6 +31,7 @@ const PAYMENT_METHODS = [
 
 export default function Invoices() {
   const navigate = useNavigate();
+  const { success, error: notifyError } = useNotification();
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -74,7 +76,7 @@ export default function Invoices() {
 
   const openPayDialog = async (inv) => {
     const balance = parseFloat(inv.balance || 0);
-    if (balance <= 0) { toast.error('Invoice already paid'); return; }
+    if (balance <= 0) { notifyError('Invoice already paid'); return; }
     setPayTarget(inv);
     setPayAmount(balance.toString());
     setPayMethod('CASH');
@@ -91,7 +93,7 @@ export default function Invoices() {
   const handleFileSelect = (e) => {
     const files = Array.from(e.target.files || []);
     const valid = files.filter(f => {
-      if (f.size > 5 * 1024 * 1024) { toast.error(`${f.name} exceeds 5MB limit`); return false; }
+      if (f.size > 5 * 1024 * 1024) { notifyError(`${f.name} exceeds 5MB limit`); return false; }
       return true;
     });
     setPendingFiles(prev => [...prev, ...valid]);
@@ -102,9 +104,9 @@ export default function Invoices() {
 
   const handlePay = async () => {
     const amount = parseFloat(payAmount);
-    if (!amount || amount <= 0) { toast.error('Enter a valid amount'); return; }
+    if (!amount || amount <= 0) { notifyError('Enter a valid amount'); return; }
     const balance = parseFloat(payTarget.balance);
-    if (amount > balance) { toast.error(`Amount exceeds balance (৳${balance.toLocaleString()})`); return; }
+    if (amount > balance) { notifyError(`Amount exceeds balance (৳${balance.toLocaleString()})`); return; }
     const refParts = [payMethod];
     if (payReference) refParts.push(payReference);
     if (payNote) refParts.push(payNote);
@@ -114,7 +116,7 @@ export default function Invoices() {
         currency: payTarget.currency || 'BDT',
         transactionExternalKey: refParts.join(':'),
       });
-      toast.success(`Payment of ৳${amount.toLocaleString()} recorded`);
+      success(`Payment of ৳${amount.toLocaleString()} recorded`);
       setPayDialogOpen(false);
 
       // Save attachments + show receipt
@@ -123,7 +125,7 @@ export default function Invoices() {
         for (const file of pendingFiles) {
           await saveAttachment(paymentId, file);
         }
-        toast.success(`${pendingFiles.length} attachment(s) saved`);
+        success(`${pendingFiles.length} attachment(s) saved`);
       }
       if (paymentId) {
         try {
@@ -139,7 +141,8 @@ export default function Invoices() {
       }
       loadInvoices();
     } catch (e) {
-      toast.error(e.response?.data?.message || 'Payment failed');
+      const { message, detail } = extractError(e, 'Payment failed');
+      notifyError(message, detail);
     } finally { setPaying(false); }
   };
 

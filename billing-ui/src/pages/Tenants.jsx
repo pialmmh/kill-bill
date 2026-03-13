@@ -9,7 +9,8 @@ import { Add as AddIcon, Delete, Upload, CheckCircle, Error as ErrorIcon } from 
 import { useAuth } from '../context/AuthContext';
 import { getTenants, addTenant, removeTenant, saveTenants } from '../services/auth';
 import { createTenantInKB, getTenantByApiKey } from '../services/killbill';
-import toast from 'react-hot-toast';
+import { useNotification } from '../components/ErrorNotification';
+import { extractError } from '../services/errorHelper';
 
 const emptyForm = {
   name: '', apiKey: '', apiSecret: '', externalKey: '',
@@ -19,6 +20,7 @@ const emptyForm = {
 
 export default function Tenants() {
   const { isSuper, refreshTenants } = useAuth();
+  const { success, error: notifyError } = useNotification();
   const [tenants, setTenantsState] = useState([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState(emptyForm);
@@ -35,12 +37,12 @@ export default function Tenants() {
 
   const handleCreate = async () => {
     if (!form.name || !form.apiKey || !form.apiSecret || !form.adminUsername || !form.adminPassword) {
-      toast.error('All fields are required');
+      notifyError('All fields are required');
       return;
     }
     // Check duplicate
     if (tenants.find(t => t.apiKey === form.apiKey)) {
-      toast.error('Tenant with this API key already exists');
+      notifyError('Tenant with this API key already exists');
       return;
     }
     try {
@@ -63,12 +65,12 @@ export default function Tenants() {
       const updated = addTenant(tenant);
       setTenantsState(updated);
       refreshTenants();
-      toast.success(`Tenant "${form.name}" created`);
+      success(`Tenant "${form.name}" created`);
       setDialogOpen(false);
       setForm(emptyForm);
     } catch (e) {
-      const msg = e.response?.data?.message || e.message;
-      if (msg?.includes('already exists')) {
+      const errMsg = e.response?.data?.message || e.message;
+      if (errMsg?.includes('already exists')) {
         // Tenant exists in KB but not in local registry — add it
         const tenant = {
           name: form.name,
@@ -83,11 +85,12 @@ export default function Tenants() {
         const updated = addTenant(tenant);
         setTenantsState(updated);
         refreshTenants();
-        toast.success(`Tenant "${form.name}" registered (already existed in Kill Bill)`);
+        success(`Tenant "${form.name}" registered (already existed in Kill Bill)`);
         setDialogOpen(false);
         setForm(emptyForm);
       } else {
-        toast.error(`Failed: ${msg}`);
+        const { message, detail } = extractError(e, 'Failed to create tenant');
+        notifyError(message, detail);
       }
     } finally {
       setSaving(false);
@@ -99,7 +102,7 @@ export default function Tenants() {
     const updated = removeTenant(apiKey);
     setTenantsState(updated);
     refreshTenants();
-    toast.success(`Tenant "${name}" removed from registry`);
+    success(`Tenant "${name}" removed from registry`);
   };
 
   const handleVerify = async (apiKey) => {

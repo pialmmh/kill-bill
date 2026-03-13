@@ -8,7 +8,8 @@ import {
 } from '@mui/material';
 import { Add as AddIcon } from '@mui/icons-material';
 import { getAccounts, createAccount } from '../services/killbill';
-import toast from 'react-hot-toast';
+import { useNotification } from '../components/ErrorNotification';
+import { extractError } from '../services/errorHelper';
 
 const emptyForm = {
   name: '', email: '', phone: '', company: '',
@@ -18,6 +19,7 @@ const emptyForm = {
 
 export default function Customers() {
   const navigate = useNavigate();
+  const { success, error: notifyError } = useNotification();
   const [accounts, setAccounts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -32,7 +34,7 @@ export default function Customers() {
       const res = await getAccounts(0, 200);
       setAccounts(res.data || []);
     } catch (e) {
-      toast.error('Failed to load customers');
+      notifyError('Failed to load customers');
     } finally {
       setLoading(false);
     }
@@ -40,18 +42,19 @@ export default function Customers() {
 
   const handleCreate = async () => {
     if (!form.name || !form.externalKey) {
-      toast.error('Name and External Key are required');
+      notifyError('Name and External Key are required');
       return;
     }
     try {
       setSaving(true);
       await createAccount(form);
-      toast.success('Customer created');
+      success('Customer created');
       setDialogOpen(false);
       setForm(emptyForm);
       loadAccounts();
     } catch (e) {
-      toast.error(e.response?.data?.message || 'Failed to create customer');
+      const { message, detail } = extractError(e, 'Failed to create customer');
+      notifyError(message, detail);
     } finally {
       setSaving(false);
     }
