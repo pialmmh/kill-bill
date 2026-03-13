@@ -1,6 +1,6 @@
 import { useState, createContext, useContext, useCallback } from 'react';
 import { Snackbar, Alert, IconButton, Box, Typography, Collapse } from '@mui/material';
-import { ContentCopy, ExpandMore, ExpandLess } from '@mui/icons-material';
+import { ContentCopy, ExpandMore, ExpandLess, Close } from '@mui/icons-material';
 
 const NotificationContext = createContext(null);
 
@@ -58,7 +58,6 @@ export function NotificationProvider({ children }) {
         <Alert
           severity={severity}
           variant="filled"
-          onClose={() => setOpen(false)}
           sx={{
             width: '100%',
             alignItems: 'flex-start',
@@ -75,6 +74,10 @@ export function NotificationProvider({ children }) {
               <IconButton size="small" color="inherit" onClick={handleCopy}
                 title="Copy to clipboard">
                 <ContentCopy sx={{ fontSize: 16 }} />
+              </IconButton>
+              <IconButton size="small" color="inherit" onClick={() => setOpen(false)}
+                title="Close">
+                <Close fontSize="small" />
               </IconButton>
             </Box>
           }
